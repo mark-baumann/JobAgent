@@ -331,6 +331,11 @@ Mit freundlichen Grüßen`;
         firma,
         adresse
       });
+
+      // FEHLTE: Jetzt das DOCX als Datei speichern!
+      const out = doc.getZip().generate({ type: "blob" });
+      saveAs(out, "Bewerbung.docx");
+      toast({ title: "DOCX erstellt", description: "Die DOCX-Datei wurde heruntergeladen." });
     } catch (error) {
       toast({ title: "Fehler beim DOCX-Export", description: String(error), variant: "destructive" });
     }
