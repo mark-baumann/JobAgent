@@ -22,6 +22,9 @@ import {
   Brain
 } from "lucide-react";
 import OpenAI from "openai";
+import PizZip from "pizzip";
+import Docxtemplater from "docxtemplater";
+import { saveAs } from "file-saver";
 
 interface ProcessingStep {
   id: string;
@@ -50,38 +53,34 @@ export default function ApplicationGenerator() {
   const [progress, setProgress] = useState(0);
   const [selectedStep, setSelectedStep] = useState<string | null>(null);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+
+  // Eingabefelder für Firma, Adresse, Titel
+  const [firmaInput, setFirmaInput] = useState("");
+  const [adresseInput, setAdresseInput] = useState("");
+  const [titleInput, setTitleInput] = useState("");
+
   const { toast } = useToast();
 
   const gptModels = [
-    { value: "gpt-4o", label: "GPT-4o (Empfohlen)", description: "Neuestes und leistungsstärktes Modell" },
+    { value: "gpt-4o", label: "GPT-4o (Empfohlen)", description: "Neuestes und leistungsstärkstes Modell" },
     { value: "gpt-4", label: "GPT-4", description: "Vorheriges Flagship-Modell" },
     { value: "gpt-4-turbo", label: "GPT-4 Turbo", description: "Schnellere Version von GPT-4" },
     { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", description: "Günstiger und schneller" }
   ];
 
-  // API Key aus localStorage laden
   useEffect(() => {
     const savedApiKey = localStorage.getItem("openai-api-key");
     const savedModel = localStorage.getItem("openai-model");
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
-    if (savedModel) {
-      setSelectedModel(savedModel);
-    }
+    if (savedApiKey) setApiKey(savedApiKey);
+    if (savedModel) setSelectedModel(savedModel);
   }, []);
 
-  // API Key und Modell in localStorage speichern
   useEffect(() => {
-    if (apiKey) {
-      localStorage.setItem("openai-api-key", apiKey);
-    }
+    if (apiKey) localStorage.setItem("openai-api-key", apiKey);
   }, [apiKey]);
 
   useEffect(() => {
-    if (selectedModel) {
-      localStorage.setItem("openai-model", selectedModel);
-    }
+    if (selectedModel) localStorage.setItem("openai-model", selectedModel);
   }, [selectedModel]);
 
   const baseApplication = `Sehr geehrte Damen und Herren,
@@ -98,49 +97,16 @@ Gerne überzeuge ich Sie in einem persönlichen Gespräch von meiner Motivation 
 
 Mit freundlichen Grüßen`;
 
-  const initializeSteps = () => {
-    return [
-      {
-        id: "validate-inputs",
-        title: "Eingaben validieren",
-        description: "Überprüfung der API-Schlüssel und Eingabedaten",
-        status: "pending" as const
-      },
-      {
-        id: "analyze-job",
-        title: "Stellenanzeige analysieren",
-        description: "Extrahierung der Anforderungen und Qualifikationen",
-        status: "pending" as const
-      },
-      {
-        id: "process-resume",
-        title: "Lebenslauf verarbeiten",
-        description: "Analyse der vorhandenen Qualifikationen",
-        status: "pending" as const
-      },
-      {
-        id: "match-skills",
-        title: "Skills matchen",
-        description: "Abgleich zwischen Anforderungen und Qualifikationen",
-        status: "pending" as const
-      },
-      {
-        id: "generate-application",
-        title: "Anschreiben generieren",
-        description: "Erstellung des individualisierten Anschreibens",
-        status: "pending" as const
-      }
-    ];
-  };
+  const initializeSteps = () => [
+    { id: "validate-inputs", title: "Eingaben validieren", description: "Überprüfung der API-Schlüssel und Eingabedaten", status: "pending" as const },
+    { id: "analyze-job", title: "Stellenanzeige analysieren", description: "Extrahierung der Anforderungen und Qualifikationen", status: "pending" as const },
+    { id: "process-resume", title: "Lebenslauf verarbeiten", description: "Analyse der vorhandenen Qualifikationen", status: "pending" as const },
+    { id: "match-skills", title: "Skills matchen", description: "Abgleich zwischen Anforderungen und Qualifikationen", status: "pending" as const },
+    { id: "generate-application", title: "Anschreiben generieren", description: "Erstellung des individualisierten Anschreibens", status: "pending" as const }
+  ];
 
   const updateStep = (stepId: string, updates: Partial<ProcessingStep>) => {
-    setProcessingSteps(prev => 
-      prev.map(step => 
-        step.id === stepId 
-          ? { ...step, ...updates }
-          : step
-      )
-    );
+    setProcessingSteps(prev => prev.map(step => step.id === stepId ? { ...step, ...updates } : step));
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,46 +114,27 @@ Mit freundlichen Grüßen`;
     if (file) {
       if (file.type === 'application/pdf') {
         setResumeFile(file);
-        toast({
-          title: "Datei hochgeladen",
-          description: `${file.name} wurde erfolgreich hochgeladen.`
-        });
+        toast({ title: "Datei hochgeladen", description: `${file.name} wurde erfolgreich hochgeladen.` });
       } else {
-        toast({
-          title: "Ungültiges Dateiformat",
-          description: "Bitte laden Sie eine PDF-Datei hoch.",
-          variant: "destructive"
-        });
+        toast({ title: "Ungültiges Dateiformat", description: "Bitte laden Sie eine PDF-Datei hoch.", variant: "destructive" });
       }
     }
   };
 
-  // Helper to clean Markdown code block from OpenAI JSON responses
   function extractJsonFromMarkdown(text: string): string | null {
-    // Extrahiere den ersten JSON-Block aus dem Text
     const match = text.match(/\{[\s\S]*\}/);
     return match ? match[0] : null;
   }
 
   const generateApplication = async () => {
     if (!apiKey) {
-      toast({
-        title: "API-Schlüssel fehlt",
-        description: "Bitte geben Sie Ihren OpenAI API-Schlüssel ein.",
-        variant: "destructive"
-      });
+      toast({ title: "API-Schlüssel fehlt", description: "Bitte geben Sie Ihren OpenAI API-Schlüssel ein.", variant: "destructive" });
       return;
     }
-
     if (!jobDescription) {
-      toast({
-        title: "Stellenanzeige fehlt",
-        description: "Bitte fügen Sie eine Stellenanzeige ein.",
-        variant: "destructive"
-      });
+      toast({ title: "Stellenanzeige fehlt", description: "Bitte fügen Sie eine Stellenanzeige ein.", variant: "destructive" });
       return;
     }
-
     setIsProcessing(true);
     setProgress(0);
     setAnalysisResult(null);
@@ -195,36 +142,25 @@ Mit freundlichen Grüßen`;
     setProcessingSteps(steps);
 
     try {
-      const openai = new OpenAI({
-        apiKey: apiKey,
-        dangerouslyAllowBrowser: true
-      });
+      const openai = new OpenAI({ apiKey: apiKey, dangerouslyAllowBrowser: true });
 
       // Schritt 1: Eingaben validieren
       updateStep("validate-inputs", { status: "processing" });
       setProgress(10);
-      
       await new Promise(resolve => setTimeout(resolve, 1000));
-      updateStep("validate-inputs", { 
-        status: "completed", 
-        details: "API-Schlüssel und Eingaben sind gültig" 
-      });
+      updateStep("validate-inputs", { status: "completed", details: "API-Schlüssel und Eingaben sind gültig" });
       setProgress(20);
 
       // Schritt 2: Stellenanzeige analysieren
       updateStep("analyze-job", { status: "processing" });
-      
       const jobAnalysisPrompt = `
         Analysiere diese Stellenanzeige und extrahiere die wichtigsten Anforderungen:
-        
         ${jobDescription}
-        
         Gib mir eine strukturierte Antwort mit:
         1. Technische Anforderungen (Programmiersprachen, Frameworks, Tools)
         2. Fachliche Anforderungen (Erfahrung, Qualifikationen)
         3. Soft Skills
         4. Branchenspezifische Kenntnisse
-        
         Antwort als JSON:
         {
           "technical_requirements": ["requirement1", "requirement2"],
@@ -233,71 +169,48 @@ Mit freundlichen Grüßen`;
           "industry_knowledge": ["knowledge1", "knowledge2"]
         }
       `;
-
       const jobAnalysis = await openai.chat.completions.create({
         model: selectedModel,
         messages: [{ role: "user", content: jobAnalysisPrompt }],
         temperature: 0.3
       });
-
       const jobRequirementsRaw = extractJsonFromMarkdown(jobAnalysis.choices[0].message.content || "");
       let jobRequirements = {};
       if (jobRequirementsRaw) {
         try {
           jobRequirements = JSON.parse(jobRequirementsRaw);
         } catch (e) {
-          toast({
-            title: "Fehler beim Verarbeiten der KI-Antwort",
-            description: "Die Antwort der KI konnte nicht als JSON gelesen werden.",
-            variant: "destructive"
-          });
+          toast({ title: "Fehler beim Verarbeiten der KI-Antwort", description: "Die Antwort der KI konnte nicht als JSON gelesen werden.", variant: "destructive" });
           setIsProcessing(false);
           return;
         }
       } else {
-        toast({
-          title: "Fehler beim Verarbeiten der KI-Antwort",
-          description: "Es wurde kein JSON-Block in der Antwort gefunden.",
-          variant: "destructive"
-        });
+        toast({ title: "Fehler beim Verarbeiten der KI-Antwort", description: "Es wurde kein JSON-Block in der Antwort gefunden.", variant: "destructive" });
         setIsProcessing(false);
         return;
       }
-      
-      updateStep("analyze-job", { 
-        status: "completed", 
-        details: `${jobRequirements.technical_requirements?.length || 0} technische Anforderungen gefunden` 
-      });
+      updateStep("analyze-job", { status: "completed", details: `${jobRequirements.technical_requirements?.length || 0} technische Anforderungen gefunden` });
       setProgress(40);
 
-      // Schritt 3: Lebenslauf verarbeiten (simuliert, da wir keinen echten PDF-Parser haben)
+      // Schritt 3: Lebenslauf verarbeiten (simuliert)
       updateStep("process-resume", { status: "processing" });
-      
       await new Promise(resolve => setTimeout(resolve, 1500));
       const candidateSkills = [
         "Python", "Angular", "TypeScript", "Java", "Hibernate", 
         "Scrum", "Produktverantwortung", "Software Architektur",
         "Wirtschaftsinformatik", "IT-Kaufmann", "KI"
       ];
-      
-      updateStep("process-resume", { 
-        status: "completed", 
-        details: `${candidateSkills.length} Qualifikationen extrahiert` 
-      });
+      updateStep("process-resume", { status: "completed", details: `${candidateSkills.length} Qualifikationen extrahiert` });
       setProgress(60);
 
       // Schritt 4: Skills matchen
       updateStep("match-skills", { status: "processing" });
-      
       const matchPrompt = `
         Vergleiche die Stellenanforderungen mit den vorhandenen Skills:
-        
         Stellenanforderungen:
         ${JSON.stringify(jobRequirements, null, 2)}
-        
         Vorhandene Skills:
         ${candidateSkills.join(", ")}
-        
         Gib mir eine Analyse als JSON:
         {
           "matched_skills": ["skill1", "skill2"],
@@ -305,58 +218,39 @@ Mit freundlichen Grüßen`;
           "relevant_experiences": ["experience1", "experience2"]
         }
       `;
-
       const skillMatch = await openai.chat.completions.create({
         model: selectedModel,
         messages: [{ role: "user", content: matchPrompt }],
         temperature: 0.3
       });
-
       const matchResultRaw = extractJsonFromMarkdown(skillMatch.choices[0].message.content || "");
       let matchResult = {};
       if (matchResultRaw) {
         try {
           matchResult = JSON.parse(matchResultRaw);
         } catch (e) {
-          toast({
-            title: "Fehler beim Verarbeiten der KI-Antwort",
-            description: "Die Antwort der KI konnte nicht als JSON gelesen werden.",
-            variant: "destructive"
-          });
+          toast({ title: "Fehler beim Verarbeiten der KI-Antwort", description: "Die Antwort der KI konnte nicht als JSON gelesen werden.", variant: "destructive" });
           setIsProcessing(false);
           return;
         }
       } else {
-        toast({
-          title: "Fehler beim Verarbeiten der KI-Antwort",
-          description: "Es wurde kein JSON-Block in der Antwort gefunden.",
-          variant: "destructive"
-        });
+        toast({ title: "Fehler beim Verarbeiten der KI-Antwort", description: "Es wurde kein JSON-Block in der Antwort gefunden.", variant: "destructive" });
         setIsProcessing(false);
         return;
       }
-      
-      updateStep("match-skills", { 
-        status: "completed", 
-        details: `${matchResult.matched_skills?.length || 0} passende Skills gefunden` 
-      });
+      updateStep("match-skills", { status: "completed", details: `${matchResult.matched_skills?.length || 0} passende Skills gefunden` });
       setProgress(80);
 
       // Schritt 5: Anschreiben generieren
       updateStep("generate-application", { status: "processing" });
-      
       const applicationPrompt = `
         Erstelle ein individualisiertes Anschreiben basierend auf:
-        
         Basis-Anschreiben:
         ${baseApplication}
-        
         Stellenanforderungen:
         ${JSON.stringify(jobRequirements, null, 2)}
-        
         Passende Skills:
         ${JSON.stringify(matchResult.matched_skills, null, 2)}
-        
         Regeln:
         - Behalte den ersten und letzten Absatz EXAKT bei
         - Ändere nur den mittleren Teil (zwischen den ### Markierungen)
@@ -368,22 +262,15 @@ Mit freundlichen Grüßen`;
           * Wenn KI gebraucht wird: erwähne KI-Erfahrung
         - Passe den Text natürlich an die Stelle an
         - Schreibe professionell und überzeugend
-        
         Gib mir das komplette Anschreiben zurück.
       `;
-
       const applicationResult = await openai.chat.completions.create({
         model: selectedModel,
         messages: [{ role: "user", content: applicationPrompt }],
         temperature: 0.5
       });
-
       const finalApplication = applicationResult.choices[0].message.content || "";
-      
-      updateStep("generate-application", { 
-        status: "completed", 
-        details: "Individualisiertes Anschreiben erstellt" 
-      });
+      updateStep("generate-application", { status: "completed", details: "Individualisiertes Anschreiben erstellt" });
       setProgress(100);
 
       setAnalysisResult({
@@ -396,27 +283,12 @@ Mit freundlichen Grüßen`;
         finalApplication
       });
 
-      toast({
-        title: "Anschreiben generiert",
-        description: "Ihr individualisiertes Anschreiben wurde erfolgreich erstellt.",
-        variant: "default"
-      });
+      toast({ title: "Anschreiben generiert", description: "Ihr individualisiertes Anschreiben wurde erfolgreich erstellt.", variant: "default" });
 
     } catch (error) {
       console.error("Fehler bei der Generierung:", error);
-      toast({
-        title: "Fehler aufgetreten",
-        description: "Bei der Generierung ist ein Fehler aufgetreten. Bitte prüfen Sie Ihren API-Schlüssel.",
-        variant: "destructive"
-      });
-      
-      setProcessingSteps(prev => 
-        prev.map(step => 
-          step.status === "processing" 
-            ? { ...step, status: "error" as const }
-            : step
-        )
-      );
+      toast({ title: "Fehler aufgetreten", description: "Bei der Generierung ist ein Fehler aufgetreten. Bitte prüfen Sie Ihren API-Schlüssel.", variant: "destructive" });
+      setProcessingSteps(prev => prev.map(step => step.status === "processing" ? { ...step, status: "error" as const } : step));
     } finally {
       setIsProcessing(false);
     }
@@ -434,6 +306,35 @@ Mit freundlichen Grüßen`;
         return <div className="w-4 h-4 rounded-full border-2 border-muted" />;
     }
   };
+
+  async function handleDocxExport() {
+    if (!analysisResult?.finalApplication) {
+      toast({ title: "Kein Anschreiben", description: "Bitte generieren Sie zuerst ein Anschreiben.", variant: "destructive" });
+      return;
+    }
+    try {
+      const response = await fetch("/Vorlage.docx");
+      const arrayBuffer = await response.arrayBuffer();
+      const zip = new PizZip(arrayBuffer);
+      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+      // Werte für Platzhalter bestimmen (nur aus den Eingabefeldern!)
+      const firma = firmaInput;
+      const adresse = adresseInput;
+      const title = titleInput || "Bewerbung";
+      const datum = new Date().toLocaleDateString("de-DE");
+
+      doc.render({
+        inhalt: String(analysisResult.finalApplication || ""),
+        title,
+        datum,
+        firma,
+        adresse
+      });
+    } catch (error) {
+      toast({ title: "Fehler beim DOCX-Export", description: String(error), variant: "destructive" });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 flex flex-col items-center justify-center py-8 text-black">
@@ -525,8 +426,31 @@ Mit freundlichen Grüßen`;
                 placeholder="Fügen Sie hier die Stellenanzeige ein..."
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
-                className="min-h-[300px] bg-white border-primary/30 focus:border-primary/60 transition-colors resize-none"
+                className="min-h-[200px] bg-white border-primary/30 focus:border-primary/60 transition-colors resize-none"
               />
+              <div className="flex flex-col gap-2 mt-4">
+                <Label>Firma</Label>
+                <Input
+                  value={firmaInput}
+                  onChange={e => setFirmaInput(e.target.value)}
+                  placeholder="z.B. ACME GmbH"
+                  className="bg-white"
+                />
+                <Label>Adresse</Label>
+                <Input
+                  value={adresseInput}
+                  onChange={e => setAdresseInput(e.target.value)}
+                  placeholder="z.B. Musterstraße 1, 12345 Musterstadt"
+                  className="bg-white"
+                />
+                <Label>Titel</Label>
+                <Input
+                  value={titleInput}
+                  onChange={e => setTitleInput(e.target.value)}
+                  placeholder="z.B. Bewerbung als Softwareentwickler"
+                  className="bg-white"
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -753,6 +677,13 @@ Mit freundlichen Grüßen`;
                   className="w-full mt-4 text-black bg-white border border-blue-200"
                 >
                   In Zwischenablage kopieren
+                </Button>
+                <Button
+                  onClick={handleDocxExport}
+                  variant="outline"
+                  className="w-full mt-4 text-black bg-white border border-blue-200"
+                >
+                  DOCX herunterladen
                 </Button>
               </CardContent>
             </Card>
