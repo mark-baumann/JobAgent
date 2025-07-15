@@ -163,8 +163,10 @@ Mit freundlichen Grüßen`;
   };
 
   // Helper to clean Markdown code block from OpenAI JSON responses
-  function extractJsonFromMarkdown(text: string): string {
-    return text.replace(/```json|```/g, '').trim();
+  function extractJsonFromMarkdown(text: string): string | null {
+    // Extrahiere den ersten JSON-Block aus dem Text
+    const match = text.match(/\{[\s\S]*\}/);
+    return match ? match[0] : null;
   }
 
   const generateApplication = async () => {
@@ -238,9 +240,30 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
 
-      const jobRequirements = JSON.parse(
-        extractJsonFromMarkdown(jobAnalysis.choices[0].message.content || "{}")
-      );
+      const jobRequirementsRaw = extractJsonFromMarkdown(jobAnalysis.choices[0].message.content || "");
+      let jobRequirements = {};
+      if (jobRequirementsRaw) {
+        try {
+          jobRequirements = JSON.parse(jobRequirementsRaw);
+        } catch (e) {
+          toast({
+            title: "Fehler beim Verarbeiten der KI-Antwort",
+            description: "Die Antwort der KI konnte nicht als JSON gelesen werden.",
+            variant: "destructive"
+          });
+          setIsProcessing(false);
+          return;
+        }
+      } else {
+        toast({
+          title: "Fehler beim Verarbeiten der KI-Antwort",
+          description: "Es wurde kein JSON-Block in der Antwort gefunden.",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+        return;
+      }
+      
       updateStep("analyze-job", { 
         status: "completed", 
         details: `${jobRequirements.technical_requirements?.length || 0} technische Anforderungen gefunden` 
@@ -289,9 +312,30 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
 
-      const matchResult = JSON.parse(
-        extractJsonFromMarkdown(skillMatch.choices[0].message.content || "{}")
-      );
+      const matchResultRaw = extractJsonFromMarkdown(skillMatch.choices[0].message.content || "");
+      let matchResult = {};
+      if (matchResultRaw) {
+        try {
+          matchResult = JSON.parse(matchResultRaw);
+        } catch (e) {
+          toast({
+            title: "Fehler beim Verarbeiten der KI-Antwort",
+            description: "Die Antwort der KI konnte nicht als JSON gelesen werden.",
+            variant: "destructive"
+          });
+          setIsProcessing(false);
+          return;
+        }
+      } else {
+        toast({
+          title: "Fehler beim Verarbeiten der KI-Antwort",
+          description: "Es wurde kein JSON-Block in der Antwort gefunden.",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+        return;
+      }
+      
       updateStep("match-skills", { 
         status: "completed", 
         details: `${matchResult.matched_skills?.length || 0} passende Skills gefunden` 
