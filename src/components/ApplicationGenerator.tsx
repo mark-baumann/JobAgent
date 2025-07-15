@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Key, 
@@ -17,7 +18,8 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Info
+  Info,
+  Brain
 } from "lucide-react";
 import OpenAI from "openai";
 
@@ -38,6 +40,7 @@ interface AnalysisResult {
 
 export default function ApplicationGenerator() {
   const [apiKey, setApiKey] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gpt-4o");
   const [showApiKey, setShowApiKey] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -49,20 +52,37 @@ export default function ApplicationGenerator() {
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const gptModels = [
+    { value: "gpt-4o", label: "GPT-4o (Empfohlen)", description: "Neuestes und leistungsstärktes Modell" },
+    { value: "gpt-4", label: "GPT-4", description: "Vorheriges Flagship-Modell" },
+    { value: "gpt-4-turbo", label: "GPT-4 Turbo", description: "Schnellere Version von GPT-4" },
+    { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", description: "Günstiger und schneller" }
+  ];
+
   // API Key aus localStorage laden
   useEffect(() => {
     const savedApiKey = localStorage.getItem("openai-api-key");
+    const savedModel = localStorage.getItem("openai-model");
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
+    if (savedModel) {
+      setSelectedModel(savedModel);
+    }
   }, []);
 
-  // API Key in localStorage speichern
+  // API Key und Modell in localStorage speichern
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem("openai-api-key", apiKey);
     }
   }, [apiKey]);
+
+  useEffect(() => {
+    if (selectedModel) {
+      localStorage.setItem("openai-model", selectedModel);
+    }
+  }, [selectedModel]);
 
   const baseApplication = `Sehr geehrte Damen und Herren,
  
@@ -208,7 +228,7 @@ Mit freundlichen Grüßen`;
       `;
 
       const jobAnalysis = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: selectedModel,
         messages: [{ role: "user", content: jobAnalysisPrompt }],
         temperature: 0.3
       });
@@ -257,7 +277,7 @@ Mit freundlichen Grüßen`;
       `;
 
       const skillMatch = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: selectedModel,
         messages: [{ role: "user", content: matchPrompt }],
         temperature: 0.3
       });
@@ -300,7 +320,7 @@ Mit freundlichen Grüßen`;
       `;
 
       const applicationResult = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: selectedModel,
         messages: [{ role: "user", content: applicationPrompt }],
         temperature: 0.5
       });
@@ -378,44 +398,70 @@ Mit freundlichen Grüßen`;
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Eingabe Sektion */}
           <div className="lg:col-span-2 space-y-8">
-            {/* API Key */}
-            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="w-5 h-5" />
-                  OpenAI API-Schlüssel
+            {/* API Key & Model Selection */}
+            <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Key className="w-5 h-5 text-primary" />
+                  KI-Konfiguration
                 </CardTitle>
                 <CardDescription>
-                  Geben Sie Ihren OpenAI API-Schlüssel ein für die KI-Verarbeitung
+                  Konfigurieren Sie Ihren API-Schlüssel und wählen Sie das gewünschte Modell
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <Input
-                    type={showApiKey ? "text" : "password"}
-                    placeholder="sk-..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="pr-10"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-0 top-0 h-full px-3"
-                  >
-                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">OpenAI API-Schlüssel</Label>
+                  <div className="relative">
+                    <Input
+                      id="api-key"
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="pr-10 bg-background/50 border-primary/30 focus:border-primary/60 transition-colors"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-primary/10"
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="model-select">KI-Modell</Label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger className="bg-background/50 border-primary/30 focus:border-primary/60 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-primary" />
+                        <SelectValue placeholder="Wählen Sie ein Modell" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-background/95 backdrop-blur-sm border-primary/20 shadow-xl">
+                      {gptModels.map((model) => (
+                        <SelectItem key={model.value} value={model.value} className="hover:bg-primary/10 focus:bg-primary/10">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{model.label}</span>
+                            <span className="text-xs text-muted-foreground">{model.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
 
             {/* Stellenanzeige */}
-            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+            <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="w-5 h-5 text-primary" />
                   Stellenanzeige
                 </CardTitle>
                 <CardDescription>
@@ -427,16 +473,16 @@ Mit freundlichen Grüßen`;
                   placeholder="Fügen Sie hier die Stellenanzeige ein..."
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
-                  className="min-h-[300px]"
+                  className="min-h-[300px] bg-background/50 border-primary/30 focus:border-primary/60 transition-colors resize-none"
                 />
               </CardContent>
             </Card>
 
             {/* Lebenslauf Upload */}
-            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="w-5 h-5" />
+            <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Upload className="w-5 h-5 text-primary" />
                   Lebenslauf Upload
                 </CardTitle>
                 <CardDescription>
@@ -446,10 +492,10 @@ Mit freundlichen Grüßen`;
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-center w-full">
-                    <Label htmlFor="resume-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted rounded-lg cursor-pointer hover:bg-muted/10 transition-colors">
+                    <Label htmlFor="resume-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 hover:border-primary/50 transition-all duration-200">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="w-10 h-10 mb-3 text-muted-foreground" />
-                        <p className="mb-2 text-sm text-muted-foreground">
+                        <Upload className="w-10 h-10 mb-3 text-primary/70" />
+                        <p className="mb-2 text-sm text-foreground/80">
                           <span className="font-semibold">Klicken Sie hier</span> oder ziehen Sie die Datei hinein
                         </p>
                         <p className="text-xs text-muted-foreground">Nur PDF-Dateien</p>
@@ -473,23 +519,22 @@ Mit freundlichen Grüßen`;
             </Card>
 
             {/* Generate Button */}
-            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
+            <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
               <CardContent className="pt-6">
                 <Button
                   onClick={generateApplication}
                   disabled={isProcessing || !apiKey || !jobDescription}
-                  className="w-full"
-                  variant="gradient"
+                  className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
                   size="lg"
                 >
                   {isProcessing ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                       Generiere Anschreiben...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <Sparkles className="w-5 h-5 mr-2" />
                       Anschreiben generieren
                     </>
                   )}
@@ -502,7 +547,7 @@ Mit freundlichen Grüßen`;
           <div className="space-y-8">
             {/* Verarbeitungsfortschritt */}
             {processingSteps.length > 0 && (
-              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
+              <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
                 <CardHeader>
                   <CardTitle>Verarbeitungsfortschritt</CardTitle>
                   <CardDescription>
@@ -568,7 +613,7 @@ Mit freundlichen Grüßen`;
 
             {/* Analyse Ergebnis */}
             {analysisResult && (
-              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
+              <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
                 <CardHeader>
                   <CardTitle>Analyse Ergebnis</CardTitle>
                   <CardDescription>
@@ -631,7 +676,7 @@ Mit freundlichen Grüßen`;
 
             {/* Generiertes Anschreiben */}
             {analysisResult?.finalApplication && (
-              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
+              <Card className="bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-sm shadow-xl border-primary/20 hover:shadow-2xl transition-all duration-300">
                 <CardHeader>
                   <CardTitle>Generiertes Anschreiben</CardTitle>
                   <CardDescription>
