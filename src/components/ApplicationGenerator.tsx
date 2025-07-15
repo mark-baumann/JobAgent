@@ -162,6 +162,11 @@ Mit freundlichen Grüßen`;
     }
   };
 
+  // Helper to clean Markdown code block from OpenAI JSON responses
+  function extractJsonFromMarkdown(text: string): string {
+    return text.replace(/```json|```/g, '').trim();
+  }
+
   const generateApplication = async () => {
     if (!apiKey) {
       toast({
@@ -233,7 +238,9 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
 
-      const jobRequirements = JSON.parse(jobAnalysis.choices[0].message.content || "{}");
+      const jobRequirements = JSON.parse(
+        extractJsonFromMarkdown(jobAnalysis.choices[0].message.content || "{}")
+      );
       updateStep("analyze-job", { 
         status: "completed", 
         details: `${jobRequirements.technical_requirements?.length || 0} technische Anforderungen gefunden` 
@@ -282,7 +289,9 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
 
-      const matchResult = JSON.parse(skillMatch.choices[0].message.content || "{}");
+      const matchResult = JSON.parse(
+        extractJsonFromMarkdown(skillMatch.choices[0].message.content || "{}")
+      );
       updateStep("match-skills", { 
         status: "completed", 
         details: `${matchResult.matched_skills?.length || 0} passende Skills gefunden` 
