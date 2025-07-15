@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,8 @@ import {
   AlertCircle, 
   Loader2,
   Eye,
-  EyeOff
+  EyeOff,
+  Info
 } from "lucide-react";
 import OpenAI from "openai";
 
@@ -44,7 +45,24 @@ export default function ApplicationGenerator() {
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // API Key aus localStorage laden
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem("openai-api-key");
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
+
+  // API Key in localStorage speichern
+  useEffect(() => {
+    if (apiKey) {
+      localStorage.setItem("openai-api-key", apiKey);
+    }
+  }, [apiKey]);
 
   const baseApplication = `Sehr geehrte Damen und Herren,
  
@@ -350,18 +368,18 @@ Mit freundlichen Grüßen`;
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            AI Bewerbungsassistent
+            AI Agent
           </h1>
           <p className="text-muted-foreground text-lg">
             Generiere individuelle Anschreiben basierend auf Stellenanzeigen
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-8">
           {/* Eingabe Sektion */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
             {/* API Key */}
-            <Card className="bg-gradient-card shadow-elegant">
+            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="w-5 h-5" />
@@ -394,7 +412,7 @@ Mit freundlichen Grüßen`;
             </Card>
 
             {/* Stellenanzeige */}
-            <Card className="bg-gradient-card shadow-elegant">
+            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
@@ -415,7 +433,7 @@ Mit freundlichen Grüßen`;
             </Card>
 
             {/* Lebenslauf Upload */}
-            <Card className="bg-gradient-card shadow-elegant">
+            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="w-5 h-5" />
@@ -455,7 +473,7 @@ Mit freundlichen Grüßen`;
             </Card>
 
             {/* Generate Button */}
-            <Card className="bg-gradient-card shadow-elegant">
+            <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
               <CardContent className="pt-6">
                 <Button
                   onClick={generateApplication}
@@ -481,76 +499,139 @@ Mit freundlichen Grüßen`;
           </div>
 
           {/* Status und Ergebnis Sektion */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Verarbeitungsfortschritt */}
             {processingSteps.length > 0 && (
-              <Card className="bg-gradient-card shadow-elegant">
+              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
                 <CardHeader>
                   <CardTitle>Verarbeitungsfortschritt</CardTitle>
                   <CardDescription>
                     Echtzeitüberwachung der KI-Verarbeitung
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <Progress value={progress} className="w-full" />
-                  <div className="space-y-3">
-                    {processingSteps.map((step, index) => (
-                      <div key={step.id} className="flex items-start gap-3">
-                        <div className="mt-1">
-                          {getStepIcon(step.status)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{step.title}</p>
-                          <p className="text-xs text-muted-foreground">{step.description}</p>
-                          {step.details && (
-                            <p className="text-xs text-primary mt-1">{step.details}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
+                 <CardContent className="space-y-4">
+                   <div className="space-y-2">
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm font-medium">Fortschritt</span>
+                       <span className="text-sm text-muted-foreground">{progress}%</span>
+                     </div>
+                     <Progress 
+                       value={progress} 
+                       className="w-full cursor-pointer hover:opacity-80 transition-opacity" 
+                       onClick={() => {
+                         toast({
+                           title: "Fortschritt Details",
+                           description: `Verarbeitung zu ${progress}% abgeschlossen. ${processingSteps.filter(s => s.status === 'completed').length} von ${processingSteps.length} Schritten fertig.`
+                         });
+                       }}
+                     />
+                   </div>
+                   <div className="space-y-3">
+                     {processingSteps.map((step, index) => (
+                       <div 
+                         key={step.id} 
+                         className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer hover:shadow-md ${
+                           selectedStep === step.id 
+                             ? 'border-primary bg-primary/5' 
+                             : 'border-transparent hover:border-muted'
+                         }`}
+                         onClick={() => {
+                           setSelectedStep(selectedStep === step.id ? null : step.id);
+                           toast({
+                             title: step.title,
+                             description: step.details || step.description
+                           });
+                         }}
+                       >
+                         <div className="mt-1">
+                           {getStepIcon(step.status)}
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <p className="text-sm font-medium">{step.title}</p>
+                           <p className="text-xs text-muted-foreground">{step.description}</p>
+                           {step.details && (
+                             <p className="text-xs text-primary mt-1">{step.details}</p>
+                           )}
+                           {selectedStep === step.id && (
+                             <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                               <Info className="w-3 h-3 inline mr-1" />
+                               Klicken Sie auf andere Schritte um Details zu sehen.
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </CardContent>
               </Card>
             )}
 
             {/* Analyse Ergebnis */}
             {analysisResult && (
-              <Card className="bg-gradient-card shadow-elegant">
+              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
                 <CardHeader>
                   <CardTitle>Analyse Ergebnis</CardTitle>
                   <CardDescription>
                     Zusammenfassung der gefundenen Übereinstimmungen
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">Stellenanforderungen</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {analysisResult.requirements.map((req, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {req}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                 <CardContent className="space-y-6">
+                   <div className="space-y-3">
+                     <Label className="text-sm font-medium">Stellenanforderungen</Label>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                       {analysisResult.requirements.map((req, index) => (
+                         <Badge 
+                           key={index} 
+                           variant="outline" 
+                           className="text-xs cursor-pointer hover:bg-primary/10 transition-colors p-2 justify-start"
+                           onClick={() => {
+                             setSelectedSkill(selectedSkill === `req-${index}` ? null : `req-${index}`);
+                             toast({
+                               title: "Anforderung",
+                               description: `Diese Stelle sucht nach: ${req}. Prüfen Sie ob Ihre Erfahrung dazu passt.`
+                             });
+                           }}
+                         >
+                           {req}
+                           {selectedSkill === `req-${index}` && (
+                             <Info className="w-3 h-3 ml-1" />
+                           )}
+                         </Badge>
+                       ))}
+                     </div>
+                   </div>
 
-                  <div>
-                    <Label className="text-sm font-medium">Passende Skills</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {analysisResult.matchedSkills.map((skill, index) => (
-                        <Badge key={index} variant="success" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
+                   <div className="space-y-3">
+                     <Label className="text-sm font-medium">Passende Skills</Label>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                       {analysisResult.matchedSkills.map((skill, index) => (
+                         <Badge 
+                           key={index} 
+                           variant="success" 
+                           className="text-xs cursor-pointer hover:bg-success/20 transition-colors p-2 justify-start"
+                           onClick={() => {
+                             setSelectedSkill(selectedSkill === `skill-${index}` ? null : `skill-${index}`);
+                             toast({
+                               title: "Passender Skill",
+                               description: `Ihr Skill "${skill}" passt perfekt zu den Anforderungen dieser Stelle!`
+                             });
+                           }}
+                         >
+                           {skill}
+                           {selectedSkill === `skill-${index}` && (
+                             <Info className="w-3 h-3 ml-1" />
+                           )}
+                         </Badge>
+                       ))}
+                     </div>
+                   </div>
+                 </CardContent>
               </Card>
             )}
 
             {/* Generiertes Anschreiben */}
             {analysisResult?.finalApplication && (
-              <Card className="bg-gradient-card shadow-elegant">
+              <Card className="bg-gradient-card shadow-interactive border-0 overflow-hidden">
                 <CardHeader>
                   <CardTitle>Generiertes Anschreiben</CardTitle>
                   <CardDescription>

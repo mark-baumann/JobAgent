@@ -26,6 +26,7 @@ export default {
 			boxShadow: {
 				'elegant': 'var(--shadow-elegant)',
 				'glow': 'var(--shadow-glow)',
+				'interactive': 'var(--shadow-interactive)',
 			},
 			transitionProperty: {
 				'smooth': 'var(--transition-smooth)',

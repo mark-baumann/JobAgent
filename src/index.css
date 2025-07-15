@@ -48,6 +48,7 @@ All colors MUST be HSL.
 
     --shadow-elegant: 0 10px 25px -5px hsl(200 98% 39% / 0.1), 0 8px 10px -6px hsl(200 98% 39% / 0.1);
     --shadow-glow: 0 0 20px hsl(200 98% 39% / 0.3);
+    --shadow-interactive: 0 8px 30px -8px hsl(200 98% 39% / 0.15), 0 4px 16px -4px hsl(200 98% 39% / 0.08);
 
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
