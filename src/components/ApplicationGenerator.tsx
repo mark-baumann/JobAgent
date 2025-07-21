@@ -409,54 +409,72 @@ Mit freundlichen Grüßen`;
         },
         body: JSON.stringify({
           tasks: {
-            'import-docx': {
+            'upload-my-file': {
               operation: 'import/upload'
             },
-            'convert-to-pdf': {
+            'convert-my-file': {
               operation: 'convert',
-              input: 'import-docx',
+              input: 'upload-my-file',
               output_format: 'pdf'
             },
-            'export-pdf': {
+            'export-my-file': {
               operation: 'export/url',
-              input: 'convert-to-pdf'
+              input: 'convert-my-file'
             }
           }
         })
       });
 
       if (!jobResponse.ok) {
-        throw new Error(`Job creation failed: ${jobResponse.status}`);
+        const errorText = await jobResponse.text();
+        console.error('Job creation error:', errorText);
+        throw new Error(`Job creation failed: ${jobResponse.status} - ${errorText}`);
       }
 
       const jobData = await jobResponse.json();
-      console.log('Job created:', jobData);
+      console.log('Job created successfully:', jobData);
 
       if (!jobData.data || !jobData.data.tasks) {
-        throw new Error('Invalid job response structure');
+        throw new Error('Invalid job response structure - missing tasks');
       }
 
       // Schritt 3: DOCX-Datei hochladen
-      const importTask = jobData.data.tasks['import-docx'];
-      if (!importTask || !importTask.result || !importTask.result.form) {
-        throw new Error('Import-Task nicht gefunden oder ungültig');
+      const uploadTask = jobData.data.tasks['upload-my-file'];
+      if (!uploadTask) {
+        throw new Error('Upload-Task "upload-my-file" nicht gefunden');
+      }
+      
+      if (!uploadTask.result || !uploadTask.result.form) {
+        throw new Error('Upload-Task Form nicht verfügbar');
       }
 
+      console.log('Upload task:', uploadTask);
+
       const uploadFormData = new FormData();
+      
       // Alle Parameter aus der API-Antwort hinzufügen
-      Object.entries(importTask.result.form.parameters).forEach(([key, value]) => {
-        uploadFormData.append(key, value as string);
-      });
+      if (uploadTask.result.form.parameters) {
+        Object.entries(uploadTask.result.form.parameters).forEach(([key, value]) => {
+          uploadFormData.append(key, value as string);
+        });
+      }
+      
       uploadFormData.append('file', docxBlob, 'document.docx');
 
-      const uploadResponse = await fetch(importTask.result.form.url, {
+      console.log('Uploading to:', uploadTask.result.form.url);
+      
+      const uploadResponse = await fetch(uploadTask.result.form.url, {
         method: 'POST',
         body: uploadFormData
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.status}`);
+        const uploadError = await uploadResponse.text();
+        console.error('Upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadResponse.status} - ${uploadError}`);
       }
+
+      console.log('File uploaded successfully');
 
       // Schritt 4: Job Status abfragen bis fertig
       let jobStatus = 'waiting';
@@ -498,13 +516,20 @@ Mit freundlichen Grüßen`;
       }
 
       const finalJobData = await finalJobResponse.json();
-      const exportTask = finalJobData.data.tasks['export-pdf'];
+      console.log('Final job data:', finalJobData);
+      
+      const exportTask = finalJobData.data.tasks['export-my-file'];
 
-      if (!exportTask || !exportTask.result || !exportTask.result.files || !exportTask.result.files[0]) {
-        throw new Error('Export-Task nicht gefunden oder keine Datei verfügbar');
+      if (!exportTask) {
+        throw new Error('Export-Task "export-my-file" nicht gefunden');
+      }
+      
+      if (!exportTask.result || !exportTask.result.files || !exportTask.result.files[0]) {
+        throw new Error('Export-Task keine Datei verfügbar - Job möglicherweise noch nicht fertig');
       }
 
       const pdfUrl = exportTask.result.files[0].url;
+      console.log('PDF download URL:', pdfUrl);
       const pdfResponse = await fetch(pdfUrl);
       
       if (!pdfResponse.ok) {
