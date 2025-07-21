@@ -175,7 +175,7 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
       const jobRequirementsRaw = extractJsonFromMarkdown(jobAnalysis.choices[0].message.content || "");
-      let jobRequirements = {};
+      let jobRequirements: any = {};
       if (jobRequirementsRaw) {
         try {
           jobRequirements = JSON.parse(jobRequirementsRaw);
@@ -224,7 +224,7 @@ Mit freundlichen Grüßen`;
         temperature: 0.3
       });
       const matchResultRaw = extractJsonFromMarkdown(skillMatch.choices[0].message.content || "");
-      let matchResult = {};
+      let matchResult: any = {};
       if (matchResultRaw) {
         try {
           matchResult = JSON.parse(matchResultRaw);
@@ -244,25 +244,56 @@ Mit freundlichen Grüßen`;
       // Schritt 5: Anschreiben generieren
       updateStep("generate-application", { status: "processing" });
       const applicationPrompt = `
-        Erstelle ein individualisiertes Anschreiben basierend auf:
-        Basis-Anschreiben:
+        Du bist ein erfahrener Bewerbungsexperte und hilfst dabei, perfekte Anschreiben zu erstellen.
+
+        AUFGABE: Erstelle ein individualisiertes, überzeugendes Anschreiben basierend auf den gegebenen Informationen.
+
+        BASIS-ANSCHREIBEN (als Vorlage verwenden):
         ${baseApplication}
-        Stellenanforderungen:
+
+        STELLENANFORDERUNGEN UND ANALYSE:
         ${JSON.stringify(jobRequirements, null, 2)}
-        Passende Skills:
+
+        PASSENDE KANDIDATEN-SKILLS:
         ${JSON.stringify(matchResult.matched_skills, null, 2)}
-        Regeln:
-        - Behalte den ersten und letzten Absatz EXAKT bei
-        - Ändere nur den mittleren Teil (zwischen den ### Markierungen)
-        - Erwähne nur relevante Erfahrungen:
-          * Wenn Frontend/Angular gebraucht wird: "Frontend Entwicklung Angular bei MicroNova"
-          * Wenn Backend/Java gebraucht wird: "Backend Java mit Hibernate bei MicroNova" oder "Java in der Ausbildung bei CIB"
-          * Wenn Produktverantwortung gebraucht wird: "als Product Owner Web Technologien (Angular) und Backend Java"
-          * Wenn Scrum gebraucht wird: "Scrum Methoden"
-          * Wenn KI gebraucht wird: erwähne KI-Erfahrung
-        - Passe den Text natürlich an die Stelle an
-        - Schreibe professionell und überzeugend
-        Gib mir das komplette Anschreiben zurück.
+
+        ANWEISUNGEN FÜR EIN PERFEKTES ANSCHREIBEN:
+
+        1. STRUKTUR BEIBEHALTEN:
+           - Behalte Anrede und Schlussformel EXAKT bei
+           - Behalte den ersten Satz über Begeisterung für Softwareentwicklung bei
+           - Behalte den letzten Absatz vor der Grußformel bei
+
+        2. INDIVIDUALISIERUNG DER HAUPTABSCHNITTE:
+           - Analysiere die Stellenanforderungen gründlich
+           - Betone nur relevante Erfahrungen und Skills, die wirklich gesucht werden
+           - Verwende konkrete Beispiele und Projekte aus den passenden Skills
+           - Stelle klare Verbindungen zwischen Anforderungen und Qualifikationen her
+
+        3. SPEZIFISCHE ERWÄHNUNGEN (nur wenn relevant für die Stelle):
+           - Frontend/React/Angular/JavaScript: "Frontend-Entwicklung mit Angular und TypeScript bei MicroNova"
+           - Backend/Java/Spring: "Backend-Entwicklung mit Java und Hibernate bei MicroNova" oder "Java-Programmierung in der Ausbildung bei CIB"
+           - Python: "Python-Kenntnisse aus dem Studium der Wirtschaftsinformatik"
+           - Produktmanagement: "Erfahrung als Product Owner für Web-Technologien und Backend-Systeme"
+           - Agile Methoden: "praktische Anwendung von Scrum-Methoden"
+           - KI/Machine Learning: "Erfahrung im Bereich KI und maschinelles Lernen"
+           - Vollstack: "Erfahrung in der Fullstack-Entwicklung von Frontend bis Backend"
+
+        4. SCHREIBSTIL:
+           - Selbstbewusst aber nicht überheblich
+           - Konkret und messbar wo möglich
+           - Enthusiastisch und motiviert
+           - Professionell und auf den Punkt gebracht
+           - Verbinde Ausbildung, Studium und praktische Erfahrung geschickt
+
+        5. QUALITÄTSKRITERIEN:
+           - Jeder Satz muss einen Mehrwert bieten
+           - Keine generischen Phrasen
+           - Klarer Bezug zu den Stellenanforderungen
+           - Überzeugende Darstellung der Eignung
+           - Flüssiger, natürlicher Sprachfluss
+
+        Erstelle jetzt das perfekte, individualisierte Anschreiben, das den Kandidaten optimal für diese spezifische Stelle positioniert.
       `;
       const applicationResult = await openai.chat.completions.create({
         model: selectedModel,
@@ -332,12 +363,165 @@ Mit freundlichen Grüßen`;
         adresse
       });
 
-      // FEHLTE: Jetzt das DOCX als Datei speichern!
+      // DOCX als Datei speichern
       const out = doc.getZip().generate({ type: "blob" });
       saveAs(out, "Bewerbung.docx");
       toast({ title: "DOCX erstellt", description: "Die DOCX-Datei wurde heruntergeladen." });
     } catch (error) {
       toast({ title: "Fehler beim DOCX-Export", description: String(error), variant: "destructive" });
+    }
+  }
+
+  async function handlePdfExport() {
+    if (!analysisResult?.finalApplication) {
+      toast({ title: "Kein Anschreiben", description: "Bitte generieren Sie zuerst ein Anschreiben.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Schritt 1: DOCX erstellen
+      const response = await fetch("/Vorlage.docx");
+      const arrayBuffer = await response.arrayBuffer();
+      const zip = new PizZip(arrayBuffer);
+      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+      const firma = firmaInput;
+      const adresse = adresseInput;
+      const title = titleInput || "Bewerbung";
+      const datum = new Date().toLocaleDateString("de-DE");
+
+      doc.render({
+        inhalt: String(analysisResult.finalApplication || ""),
+        title,
+        datum,
+        firma,
+        adresse
+      });
+
+      const docxBlob = doc.getZip().generate({ type: "blob" });
+
+      // Schritt 2: CloudConvert Job erstellen
+      const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiZmQwYjc0NjdlZmQzMjk5ZWQyMjQxMmE1NDZhM2VmZGE4ZDZjZjI4Y2JkM2NlNzJiYWI4YWM0OTIxMDZiNGM4MTNkM2ExZTU5ZmVlYTQ2ZmUiLCJpYXQiOjE3NTMwODkwOTMuMTE5MTk1LCJuYmYiOjE3NTMwODkwOTMuMTE5MTk2LCJleHAiOjQ5MDg3NjI2OTMuMTEyMzUzLCJzdWIiOiI3MjQ2MzQxMyIsInNjb3BlcyI6WyJ1c2VyLnJlYWQiLCJ1c2VyLndyaXRlIiwidGFzay53cml0ZSIsInRhc2sucmVhZCIsIndlYmhvb2sucmVhZCIsIndlYmhvb2sud3JpdGUiLCJwcmVzZXQucmVhZCIsInByZXNldC53cml0ZSJdfQ.JdNKwY4JxelirCc-wSZB5zIpYHlFG1VcRA7_b7j7dO-SaAQEOC-dcN-190avzM-8oi7ejl2qU-jVmD2rg49n90RwnRBaVbEMTjLkgdexBspdOE8S4jTt3nk-EpGcVfp50_zbiD5a4IyoYPm69gc0rsVMUX5uq0U-JjJ1txgX7yKt6HZk8rstcqUpB58ZerxRT8pkoTITdHb3TGMXyuu-agJDY0BmGhdQrJmAGFEgDBANXD577UelTIicXz_MjiiDWyGDwnTavSOujnPmjtFBDGpL_BIWRYD_7wSo9fyjEHPGuklJ5_k7CrNPemwW96QxGu-VHjeBEJhgcjIFpxFvszCeUEUJ6gxhTjUoT7zeGnTKnwq1b3gRH1Ky-3pY7wRJm43tA_lcpez7LRRPPLKTSogURgsVMpungJGkG0IO1flpsRhH7eWSuqNmvCu0wDeYw2ThDUQEjXPSCY_VLAqfWwC1yil-CBytXnLuvlR0c2PWpeZGCOAqmey96qiBQQ4039AoIwS2hHGDKZzJG1VI6JXOmEXDMVvSwFr9WUIyY0zH1LxG8_Kp_9jv18-E-pjRzKxLO93cvAyQGMNC0wPL9UjHMAOmWqNvQm31nwx9I3IKmWRUXA08oca2Y5hLAnT57Eta1uaYbl3REPkBSPokPYg_J7iOowAs1-Q7Ksa3o_A',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tasks: {
+            'import-docx': {
+              operation: 'import/upload'
+            },
+            'convert-to-pdf': {
+              operation: 'convert',
+              input: 'import-docx',
+              output_format: 'pdf'
+            },
+            'export-pdf': {
+              operation: 'export/url',
+              input: 'convert-to-pdf'
+            }
+          }
+        })
+      });
+
+      if (!jobResponse.ok) {
+        throw new Error(`Job creation failed: ${jobResponse.status}`);
+      }
+
+      const jobData = await jobResponse.json();
+      console.log('Job created:', jobData);
+
+      if (!jobData.data || !jobData.data.tasks) {
+        throw new Error('Invalid job response structure');
+      }
+
+      // Schritt 3: DOCX-Datei hochladen
+      const importTask = jobData.data.tasks['import-docx'];
+      if (!importTask || !importTask.result || !importTask.result.form) {
+        throw new Error('Import-Task nicht gefunden oder ungültig');
+      }
+
+      const uploadFormData = new FormData();
+      // Alle Parameter aus der API-Antwort hinzufügen
+      Object.entries(importTask.result.form.parameters).forEach(([key, value]) => {
+        uploadFormData.append(key, value as string);
+      });
+      uploadFormData.append('file', docxBlob, 'document.docx');
+
+      const uploadResponse = await fetch(importTask.result.form.url, {
+        method: 'POST',
+        body: uploadFormData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.status}`);
+      }
+
+      // Schritt 4: Job Status abfragen bis fertig
+      let jobStatus = 'waiting';
+      let attempts = 0;
+      const maxAttempts = 30;
+
+      while (jobStatus !== 'finished' && jobStatus !== 'error' && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const statusResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`, {
+          headers: {
+            'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiZmQwYjc0NjdlZmQzMjk5ZWQyMjQxMmE1NDZhM2VmZGE4ZDZjZjI4Y2JkM2NlNzJiYWI4YWM0OTIxMDZiNGM4MTNkM2ExZTU5ZmVlYTQ2ZmUiLCJpYXQiOjE3NTMwODkwOTMuMTE5MTk1LCJuYmYiOjE3NTMwODkwOTMuMTE5MTk2LCJleHAiOjQ5MDg3NjI2OTMuMTEyMzUzLCJzdWIiOiI3MjQ2MzQxMyIsInNjb3BlcyI6WyJ1c2VyLnJlYWQiLCJ1c2VyLndyaXRlIiwidGFzay53cml0ZSIsInRhc2sucmVhZCIsIndlYmhvb2sucmVhZCIsIndlYmhvb2sud3JpdGUiLCJwcmVzZXQucmVhZCIsInByZXNldC53cml0ZSJdfQ.JdNKwY4JxelirCc-wSZB5zIpYHlFG1VcRA7_b7j7dO-SaAQEOC-dcN-190avzM-8oi7ejl2qU-jVmD2rg49n90RwnRBaVbEMTjLkgdexBspdOE8S4jTt3nk-EpGcVfp50_zbiD5a4IyoYPm69gc0rsVMUX5uq0U-JjJ1txgX7yKt6HZk8rstcqUpB58ZerxRT8pkoTITdHb3TGMXyuu-agJDY0BmGhdQrJmAGFEgDBANXD577UelTIicXz_MjiiDWyGDwnTavSOujnPmjtFBDGpL_BIWRYD_7wSo9fyjEHPGuklJ5_k7CrNPemwW96QxGu-VHjeBEJhgcjIFpxFvszCeUEUJ6gxhTjUoT7zeGnTKnwq1b3gRH1Ky-3pY7wRJm43tA_lcpez7LRRPPLKTSogURgsVMpungJGkG0IO1flpsRhH7eWSuqNmvCu0wDeYw2ThDUQEjXPSCY_VLAqfWwC1yil-CBytXnLuvlR0c2PWpeZGCOAqmey96qiBQQ4039AoIwS2hHGDKZzJG1VI6JXOmEXDMVvSwFr9WUIyY0zH1LxG8_Kp_9jv18-E-pjRzKxLO93cvAyQGMNC0wPL9UjHMAOmWqNvQm31nwx9I3IKmWRUXA08oca2Y5hLAnT57Eta1uaYbl3REPkBSPokPYg_J7iOowAs1-Q7Ksa3o_A'
+          }
+        });
+
+        if (!statusResponse.ok) {
+          throw new Error(`Status check failed: ${statusResponse.status}`);
+        }
+
+        const statusData = await statusResponse.json();
+        jobStatus = statusData.data.status;
+        console.log(`Job status: ${jobStatus}, attempt: ${attempts + 1}`);
+        attempts++;
+      }
+
+      if (jobStatus !== 'finished') {
+        throw new Error(`PDF-Konvertierung fehlgeschlagen. Status: ${jobStatus}`);
+      }
+
+      // Schritt 5: PDF herunterladen
+      const finalJobResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`, {
+        headers: {
+          'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiZmQwYjc0NjdlZmQzMjk5ZWQyMjQxMmE1NDZhM2VmZGE4ZDZjZjI4Y2JkM2NlNzJiYWI4YWM0OTIxMDZiNGM4MTNkM2ExZTU5ZmVlYTQ2ZmUiLCJpYXQiOjE3NTMwODkwOTMuMTE5MTk1LCJuYmYiOjE3NTMwODkwOTMuMTE5MTk2LCJleHAiOjQ5MDg3NjI2OTMuMTEyMzUzLCJzdWIiOiI3MjQ2MzQxMyIsInNjb3BlcyI6WyJ1c2VyLnJlYWQiLCJ1c2VyLndyaXRlIiwidGFzay53cml0ZSIsInRhc2sucmVhZCIsIndlYmhvb2sucmVhZCIsIndlYmhvb2sud3JpdGUiLCJwcmVzZXQucmVhZCIsInByZXNldC53cml0ZSJdfQ.JdNKwY4JxelirCc-wSZB5zIpYHlFG1VcRA7_b7j7dO-SaAQEOC-dcN-190avzM-8oi7ejl2qU-jVmD2rg49n90RwnRBaVbEMTjLkgdexBspdOE8S4jTt3nk-EpGcVfp50_zbiD5a4IyoYPm69gc0rsVMUX5uq0U-JjJ1txgX7yKt6HZk8rstcqUpB58ZerxRT8pkoTITdHb3TGMXyuu-agJDY0BmGhdQrJmAGFEgDBANXD577UelTIicXz_MjiiDWyGDwnTavSOujnPmjtFBDGpL_BIWRYD_7wSo9fyjEHPGuklJ5_k7CrNPemwW96QxGu-VHjeBEJhgcjIFpxFvszCeUEUJ6gxhTjUoT7zeGnTKnwq1b3gRH1Ky-3pY7wRJm43tA_lcpez7LRRPPLKTSogURgsVMpungJGkG0IO1flpsRhH7eWSuqNmvCu0wDeYw2ThDUQEjXPSCY_VLAqfWwC1yil-CBytXnLuvlR0c2PWpeZGCOAqmey96qiBQQ4039AoIwS2hHGDKZzJG1VI6JXOmEXDMVvSwFr9WUIyY0zH1LxG8_Kp_9jv18-E-pjRzKxLO93cvAyQGMNC0wPL9UjHMAOmWqNvQm31nwx9I3IKmWRUXA08oca2Y5hLAnT57Eta1uaYbl3REPkBSPokPYg_J7iOowAs1-Q7Ksa3o_A'
+        }
+      });
+
+      if (!finalJobResponse.ok) {
+        throw new Error(`Final job fetch failed: ${finalJobResponse.status}`);
+      }
+
+      const finalJobData = await finalJobResponse.json();
+      const exportTask = finalJobData.data.tasks['export-pdf'];
+
+      if (!exportTask || !exportTask.result || !exportTask.result.files || !exportTask.result.files[0]) {
+        throw new Error('Export-Task nicht gefunden oder keine Datei verfügbar');
+      }
+
+      const pdfUrl = exportTask.result.files[0].url;
+      const pdfResponse = await fetch(pdfUrl);
+      
+      if (!pdfResponse.ok) {
+        throw new Error(`PDF download failed: ${pdfResponse.status}`);
+      }
+
+      const pdfBlob = await pdfResponse.blob();
+      saveAs(pdfBlob, "Bewerbung.pdf");
+      toast({ title: "PDF erstellt", description: "Die PDF-Datei wurde heruntergeladen." });
+
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      toast({ 
+        title: "Fehler beim PDF-Export", 
+        description: `PDF-Konvertierung fehlgeschlagen: ${error}`, 
+        variant: "destructive" 
+      });
     }
   }
 
@@ -683,13 +867,22 @@ Mit freundlichen Grüßen`;
                 >
                   In Zwischenablage kopieren
                 </Button>
-                <Button
-                  onClick={handleDocxExport}
-                  variant="outline"
-                  className="w-full mt-4 text-black bg-white border border-blue-200"
-                >
-                  DOCX herunterladen
-                </Button>
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    onClick={handleDocxExport}
+                    variant="outline"
+                    className="flex-1 text-black bg-white border border-blue-200"
+                  >
+                    DOCX herunterladen
+                  </Button>
+                  <Button
+                    onClick={handlePdfExport}
+                    variant="outline"
+                    className="flex-1 text-black bg-white border border-blue-200"
+                  >
+                    PDF herunterladen
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
