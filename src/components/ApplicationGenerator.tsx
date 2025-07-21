@@ -409,12 +409,12 @@ Mit freundlichen Grüßen`;
         },
         body: JSON.stringify({
           tasks: {
-            'upload-my-file': {
+            'import-my-file': {
               operation: 'import/upload'
             },
             'convert-my-file': {
               operation: 'convert',
-              input: 'upload-my-file',
+              input: 'import-my-file',
               output_format: 'pdf'
             },
             'export-my-file': {
@@ -438,17 +438,22 @@ Mit freundlichen Grüßen`;
         throw new Error('Invalid job response structure - missing tasks');
       }
 
-      // Schritt 3: DOCX-Datei hochladen
-      const uploadTask = jobData.data.tasks['upload-my-file'];
-      if (!uploadTask) {
-        throw new Error('Upload-Task "upload-my-file" nicht gefunden');
+      // Schritt 3: DOCX-Datei hochladen - korrekte Task-Namen verwenden
+      const uploadTaskKey = Object.keys(jobData.data.tasks).find(key => 
+        jobData.data.tasks[key].operation === 'import/upload'
+      );
+      
+      if (!uploadTaskKey) {
+        console.error('Available tasks:', Object.keys(jobData.data.tasks));
+        throw new Error('Upload-Task nicht gefunden in Job Response');
       }
       
+      const uploadTask = jobData.data.tasks[uploadTaskKey];
       if (!uploadTask.result || !uploadTask.result.form) {
         throw new Error('Upload-Task Form nicht verfügbar');
       }
 
-      console.log('Upload task:', uploadTask);
+      console.log('Upload task found:', uploadTaskKey, uploadTask);
 
       const uploadFormData = new FormData();
       
@@ -518,12 +523,17 @@ Mit freundlichen Grüßen`;
       const finalJobData = await finalJobResponse.json();
       console.log('Final job data:', finalJobData);
       
-      const exportTask = finalJobData.data.tasks['export-my-file'];
+      // Export-Task dynamisch finden
+      const exportTaskKey = Object.keys(finalJobData.data.tasks).find(key => 
+        finalJobData.data.tasks[key].operation === 'export/url'
+      );
 
-      if (!exportTask) {
-        throw new Error('Export-Task "export-my-file" nicht gefunden');
+      if (!exportTaskKey) {
+        console.error('Available tasks:', Object.keys(finalJobData.data.tasks));
+        throw new Error('Export-Task nicht gefunden');
       }
       
+      const exportTask = finalJobData.data.tasks[exportTaskKey];
       if (!exportTask.result || !exportTask.result.files || !exportTask.result.files[0]) {
         throw new Error('Export-Task keine Datei verfügbar - Job möglicherweise noch nicht fertig');
       }
