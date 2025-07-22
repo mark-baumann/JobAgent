@@ -79,7 +79,8 @@ export default function ApplicationGenerator() {
     { value: "gpt-4.1-2025-04-14", label: "GPT-4.1 (Empfohlen)", description: "Neuestes und leistungsstärkstes Modell" },
     { value: "o4-mini-2025-04-16", label: "O4 Mini", description: "Schnelles Reasoning-Modell" },
     { value: "o3-2025-04-16", label: "O3", description: "Mächtiges Reasoning-Modell" },
-    { value: "gpt-4o", label: "GPT-4o", description: "Vorheriges Flagship-Modell" }
+    { value: "gpt-4o", label: "GPT-4o", description: "Vorheriges Flagship-Modell" },
+    { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", description: "Günstigeres Modell" }
   ];
 
   // Load saved settings

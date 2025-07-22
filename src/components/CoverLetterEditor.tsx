@@ -62,7 +62,7 @@ export default function CoverLetterEditor({
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setIsEditing(true)} size="sm" variant="outline">
+              <Button onClick={() => setIsEditing(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Edit3 className="w-4 h-4 mr-1" />
                 Bearbeiten
               </Button>

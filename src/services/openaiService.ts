@@ -159,7 +159,7 @@ export class OpenAIService {
          - Vermeide Technologien zu erwähnen, die nicht gesucht werden
          - Stelle Verbindungen zwischen verwandten Technologien her
 
-      Erstelle jetzt das perfekte, individualisierte Anschreiben, das den Kandidaten optimal für diese spezifische Stelle positioniert und alle wichtigen Anforderungen addressiert.
+      Erstelle jetzt das perfekte, individualisierte Anschreiben, das den Kandidaten optimal für diese spezifische Stelle positioniert und alle wichtigen Anforderungen addressiert. Beende das Anschreiben NUR mit "Mit freundlichen Grüßen" - füge KEINEN Namen oder Platzhalter wie "[DEIN NAME]" hinzu.
     `;
 
     const response = await this.openai.chat.completions.create({
