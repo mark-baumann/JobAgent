@@ -632,6 +632,19 @@ Mit freundlichen Grüßen`;
                      ))}
                    </div>
                  </div>
+
+                 {analysisResult?.extractedSkills && (
+                   <div className="space-y-3">
+                     <Label className="text-sm">Extrahierte Skills aus Lebenslauf</Label>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                       {analysisResult.extractedSkills.map((skill, index) => (
+                         <Badge key={index} variant="outline" className="text-xs bg-gray-100 border-gray-200 text-gray-800 p-2">
+                           {skill}
+                         </Badge>
+                       ))}
+                     </div>
+                   </div>
+                 )}
                </CardContent>
             </Card>
           )}

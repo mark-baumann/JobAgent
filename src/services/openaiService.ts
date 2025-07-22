@@ -1,4 +1,3 @@
-
 import OpenAI from "openai";
 
 export interface JobRequirements {
@@ -59,23 +58,27 @@ export class OpenAIService {
 
   async matchSkills(jobRequirements: JobRequirements, candidateSkills: string[], model: string): Promise<SkillMatch> {
     const prompt = `
-      Führe eine detaillierte Skill-Analyse durch:
-      
-      STELLENANFORDERUNGEN:
-      ${JSON.stringify(jobRequirements, null, 2)}
-      
-      KANDIDATEN-SKILLS:
-      ${candidateSkills.join(", ")}
-      
-      Analysiere systematisch und gib das Ergebnis als JSON zurück:
-      {
-        "matched_skills": ["Skills die perfekt oder sehr gut passen"],
-        "missing_skills": ["Wichtige Skills die fehlen"],
-        "relevant_experiences": ["Erfahrungen die besonders relevant sind"]
-      }
-      
-      Berücksichtige auch verwandte Technologien und übertragbare Skills.
-    `;
+    Vergleiche die folgenden Stellenanforderungen mit den explizit im Lebenslauf genannten Skills.
+
+    STELLENANFORDERUNGEN:
+    ${JSON.stringify(jobRequirements, null, 2)}
+
+    KANDIDATEN-SKILLS (nur aus Lebenslauf):
+    ${candidateSkills.join(", ")}
+
+    Gib das Ergebnis als JSON zurück:
+    {
+      "matched_skills": ["Nur Skills, die sowohl in den Anforderungen als auch im Lebenslauf vorkommen"],
+      "missing_skills": ["Skills aus den Anforderungen, die im Lebenslauf fehlen"],
+      "relevant_experiences": ["Erfahrungen aus dem Lebenslauf, die direkt zu den Anforderungen passen"]
+    }
+
+    Wichtig: 
+    - NUR Skills als 'matched_skills' aufnehmen, die EXAKT oder sehr ähnlich sowohl in den Anforderungen als auch im Lebenslauf stehen.
+    - Keine Annahmen oder Ergänzungen, die nicht im Lebenslauf stehen!
+    - 'missing_skills' sind alle Anforderungen, die im Lebenslauf NICHT vorkommen.
+    - 'relevant_experiences' nur, wenn sie direkt zu einer Anforderung passen.
+  `;
 
     const response = await this.openai.chat.completions.create({
       model,
@@ -170,5 +173,34 @@ export class OpenAIService {
     });
 
     return response.choices[0].message.content || "";
+  }
+
+  async extractResumeData(resumeText: string, model: string) {
+    const prompt = `
+      Extrahiere ALLE relevanten Skills, Technologien, Qualifikationen und Erfahrungen aus folgendem Lebenslauftext. Gib das Ergebnis als JSON zurück:
+      {
+        "skills": ["..."],
+        "technologies": ["..."],
+        "qualifications": ["..."],
+        "experiences": ["..."]
+      }
+      Nur explizit im Lebenslauf genannte Inhalte aufnehmen. Keine Annahmen treffen!
+
+      TEXT:
+      ${resumeText}
+    `;
+
+    const response = await this.openai.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3
+    });
+
+    const jsonContent = this.extractJsonFromMarkdown(response.choices[0].message.content || "");
+    if (!jsonContent) {
+      throw new Error("Keine gültige JSON-Antwort von der KI erhalten");
+    }
+
+    return JSON.parse(jsonContent);
   }
 }
