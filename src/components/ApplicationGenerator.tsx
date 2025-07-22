@@ -259,6 +259,8 @@ Mit freundlichen Grüßen`;
     }
   };
 
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+
   const handlePdfDownload = async () => {
     if (!currentCoverLetter) {
       toast({ title: "Kein Anschreiben", description: "Bitte generieren Sie zuerst ein Anschreiben.", variant: "destructive" });
@@ -269,6 +271,7 @@ Mit freundlichen Grüßen`;
       return;
     }
 
+    setIsPdfLoading(true); // Ladebalken starten
     try {
       const cloudConvertService = new CloudConvertService(cloudConvertApiKey);
       const pdfBlob = await cloudConvertService.convertDocxToPdf(
@@ -286,6 +289,8 @@ Mit freundlichen Grüßen`;
         description: `PDF-Konvertierung fehlgeschlagen: ${error}`, 
         variant: "destructive" 
       });
+    } finally {
+      setIsPdfLoading(false); // Ladebalken beenden
     }
   };
 
@@ -643,6 +648,7 @@ Mit freundlichen Grüßen`;
               onTextChange={handleCoverLetterChange}
               onDownloadDocx={handleDocxDownload}
               onDownloadPdf={handlePdfDownload}
+              isPdfLoading={isPdfLoading} // <--- Prop weitergeben
             />
           )}
         </div>

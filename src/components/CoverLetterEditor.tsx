@@ -1,23 +1,25 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Edit3, Save, Download, FileText } from "lucide-react";
+import { Edit3, Save, Download, FileText, Loader2, Cloud } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface CoverLetterEditorProps {
   initialText: string;
   onTextChange: (newText: string) => void;
   onDownloadDocx: () => void;
   onDownloadPdf: () => void;
+  isPdfLoading: boolean; // <-- Prop ergänzen
 }
 
 export default function CoverLetterEditor({
   initialText,
   onTextChange,
   onDownloadDocx,
-  onDownloadPdf
+  onDownloadPdf,
+  isPdfLoading
 }: CoverLetterEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(initialText);
@@ -105,11 +107,20 @@ export default function CoverLetterEditor({
           </Button>
           <Button
             onClick={onDownloadPdf}
-            variant="outline"
+            disabled={isPdfLoading}
             className="flex-1 text-black bg-white border border-blue-200"
           >
-            <Download className="w-4 h-4 mr-1" />
-            PDF herunterladen
+            {isPdfLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                PDF wird erstellt...
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4 mr-2" />
+                PDF herunterladen
+              </>
+            )}
           </Button>
         </div>
       </CardContent>
